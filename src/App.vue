@@ -1,6 +1,7 @@
 <template>
   <div id="app" v-cloak>
-    <div class="wrapper">
+    <div class="wrapper"
+    :class="{ 'disabledWrapper' : popupOpen === true }">
 
       <div class="gallery" v-if="images.length > 0">
         <div class="slider">
@@ -51,6 +52,7 @@
       <div class="buttons">
         <label for="upload-new-image">Upload new image</label>
         <input id="upload-new-image"
+        :value="null"
         type="file"
         accept="image/*"
         @change="uploadNewImage" />
@@ -59,13 +61,24 @@
       </div>
 
     </div>
+
+    <popup
+    v-show="popupOpen"
+    @close="popupOpen = false">
+    </popup>
+
   </div>
 </template>
 
 <script>
 
+import popup from "./components/popup.vue";
+
 export default {
   name: 'App',
+  components: {
+    popup
+  },
   data(){
     return{
       images:[
@@ -79,22 +92,12 @@ export default {
         require('./assets/images/Three.jpg'),
         require('./assets/images/Tie_dye.jpg'),
         require('./assets/images/Vaporwave_wallpaper.jpg'),
-
-        // "Bubbles.jpg",
-        // "Forest.jpg",
-        // "Hubble_Extreme_Deep_Field.jpg",
-        // "huntington bancshares.jpg",
-        // "Lotus.jpg",
-        // "Mansion.jpg",
-        // "Moon.jpg",
-        // "Three.jpg",
-        // "Tie_dye.jpg",
-        // "Vaporwave_wallpaper.jpg",
       ],
       currentImageIndex: 0,
       numderOfItemsPerPage: 9,
       borderPageIndexStart: 0,
       borderPageIndexEnd: 8,
+      popupOpen: false
     }
   },
   methods: {
@@ -131,28 +134,36 @@ export default {
       }
       this.images.splice(index, 1);
     },
+    selctImage(){
+      this.currentImageIndex = this.images.length - 1;
+        this.borderPageIndexStart = (this.currentPages - 1) * this.numderOfItemsPerPage;
+        this.borderPageIndexEnd = this.currentPages * this.numderOfItemsPerPage - 1;
+    },
     uploadNewImage(e) {
       const file = e.target.files[0];
       if(file){
         this.images.push(URL.createObjectURL(file));
-        this.currentImageIndex = this.images.length - 1;
-        this.borderPageIndexStart = (this.currentPages - 1) * this.numderOfItemsPerPage;
-        this.borderPageIndexEnd = this.currentPages * this.numderOfItemsPerPage - 1;
+        this.selctImage();
       }
     },
-    uploadFromFlickr(){
+    async uploadFromFlickr(){
       let indexRandom = function getRandomInt(max) {
         return Math.floor(Math.random() * max);
       }
-      fetch("https://api.flickr.com/services/rest/?method=flickr.photos.search&format=json&nojsoncallback=1&api_key=4457a3d846cd62e2f3850fa40b1e2b5f&extras=url_m&text=nature", {method: "GET"})
+      await fetch("https://api.flickr.com/services/rest/?method=flickr.photos.search&format=json&nojsoncallback=1&api_key=4457a3d846cd62e2f3850fa40b1e2b5f&extras=url_m&text=nature", {method: "GET"})
       .then(response => {
-        console.log("Status:", response.status);
+        // console.log("Status:", response.status);
         return response.json();
       })
       .then(data => {
         let photoRandom = data.photos.photo[indexRandom(data.photos.photo.length - 1)];
         this.images.push(`https://farm${photoRandom.farm}.staticflickr.com/${photoRandom.server}/${photoRandom.id}_${photoRandom.secret}.jpg`);
-      });
+      })
+      .catch(() => {
+        this.popupOpen = true
+        }
+      );
+      this.selctImage();
     }
   },
   computed:{
@@ -193,10 +204,14 @@ body{
   width: 1.2vw;
   transition: .2s;
 }
+.arrows > img:hover{
+  opacity: .7;
+}
 
 /* dynamic */
 .arrowDisabled{
-  opacity: .5;;
+  pointer-events: none;
+  opacity: .3;
 }
 div.showingImages{
   display: flex;
@@ -204,13 +219,22 @@ div.showingImages{
 img.selectedImage{
   filter: brightness(1)
 }
+.disabledWrapper{
+  pointer-events: none;
+  opacity: .2;
+}
 
 /* app */
 #app {
   width: 70vw;
   margin: 2vw auto;
   padding: 4vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   background-color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #252525;
 }
 .wrapper{
   position: relative;
@@ -219,8 +243,6 @@ img.selectedImage{
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: Arial, Helvetica, sans-serif;
-  color: #252525;
 }
 .slider{
   position: relative;
@@ -263,7 +285,7 @@ img.selectedImage{
   overflow: hidden;
 }
 .library-item-image{
-  width: auto;
+  max-width: auto;
   height: 100%;
   filter: brightness(.4);
 }
@@ -330,11 +352,3 @@ img.selectedImage{
   display: none;
 }
 </style>
-
-/* todo
-
-* if response.status !== 200 make warning
-
-* if !photoRandom.server make another request
-
-*/
